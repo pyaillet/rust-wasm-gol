@@ -1,12 +1,10 @@
 mod utils;
 
-use std::convert::TryFrom;
 use std::f64;
 use std::fmt::{Display, Formatter, Result, Write};
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use wasm_bindgen_futures::JsFuture;
 
 use js_sys::Math::random;
 use web_sys::CanvasRenderingContext2d;
@@ -31,6 +29,33 @@ pub struct Simulation {
     pub turn: usize,
 }
 
+fn coord_saturating_add(a: usize, b: usize, max_value: usize) -> usize {
+    if a + b > max_value {
+        max_value
+    } else {
+        a + b
+    }
+}
+
+fn count_neighbors(cells: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
+    (x.saturating_sub(1)..=coord_saturating_add(x, 1, cells.len()))
+        .map(|i| {
+            (y.saturating_sub(1)..=coord_saturating_add(y, 1, cells.len()))
+                .map(|j| {
+                    if i == x && j == y {
+                        0
+                    } else {
+                        match cells[i][j] {
+                            Cell::Empty => 0,
+                            Cell::Occupied => 1,
+                        }
+                    }
+                })
+                .sum::<usize>()
+        })
+        .sum()
+}
+
 #[wasm_bindgen]
 impl Simulation {
     fn new_with_size(size: usize) -> Self {
@@ -42,37 +67,10 @@ impl Simulation {
         }
     }
 
-    fn count_neighbors(&self, i: usize, j: usize) -> usize {
-        let coords: [(i32, i32); 8] = [
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, -1),
-            (0, 1),
-            (1, -1),
-            (1, 0),
-            (1, 1),
-        ];
-        coords
-            .iter()
-            .filter(|(dx, dy)| {
-                if (0 > dx + i as i32) || (dx + i as i32 >= self.size as i32) {
-                    false
-                } else if (0 > dy + j as i32) || (dy + j as i32 >= self.size as i32) {
-                    false
-                } else {
-                    self.cells[usize::try_from(dx + i as i32).unwrap()]
-                        [usize::try_from(dy + j as i32).unwrap()]
-                        == Cell::Occupied
-                }
-            })
-            .count()
-    }
-
     pub fn simulate(&mut self) {
         for i in 0..self.size {
             for j in 0..self.size {
-                let neighbors = self.count_neighbors(i, j);
+                let neighbors = count_neighbors(&self.cells, i, j);
                 self.cells[i][j] = if neighbors == 3 {
                     Cell::Occupied
                 } else if neighbors == 2 && self.cells[i][j] == Cell::Occupied {
@@ -176,19 +174,19 @@ pub fn init() -> CanvasRenderingContext2d {
 pub fn create_simulation() -> Simulation {
     Simulation::new_with_size(15)
 }
-/*
-    simulation.draw_grid(&context);
-    // simulation.next_turn();
-    simulation.fill_random();
-    simulation.draw_cells(&context);
-}
-*/
 
-pub async fn sleep(ms: i32) -> JsFuture {
-    wasm_bindgen_futures::JsFuture::from(js_sys::Promise::new(&mut |resolve, _| {
-        web_sys::window()
-            .unwrap()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, ms)
-            .unwrap();
-    }))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_count_neighbors() {
+        let cells = vec![
+            vec![Cell::Empty, Cell::Empty, Cell::Empty],
+            vec![Cell::Empty, Cell::Occupied, Cell::Empty],
+            vec![Cell::Empty, Cell::Empty, Cell::Empty],
+        ];
+        assert_eq!(count_neighbors(&cells, 1, 1), 0);
+        assert_eq!(count_neighbors(&cells, 0, 0), 1);
+    }
 }
