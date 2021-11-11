@@ -2,17 +2,13 @@ mod utils;
 
 use std::f64;
 use std::fmt::{Display, Formatter, Result, Write};
+use std::panic;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 use js_sys::Math::random;
 use web_sys::CanvasRenderingContext2d;
-
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
 
 const STEP: usize = 20;
 
@@ -38,9 +34,9 @@ fn coord_saturating_add(a: usize, b: usize, max_value: usize) -> usize {
 }
 
 fn count_neighbors(cells: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
-    (x.saturating_sub(1)..=coord_saturating_add(x, 1, cells.len()))
+    (x.saturating_sub(1)..=coord_saturating_add(x, 1, cells.len() - 1))
         .map(|i| {
-            (y.saturating_sub(1)..=coord_saturating_add(y, 1, cells.len()))
+            (y.saturating_sub(1)..=coord_saturating_add(y, 1, cells.len() - 1))
                 .map(|j| {
                     if i == x && j == y {
                         0
@@ -152,6 +148,7 @@ impl Display for Simulation {
 
 #[wasm_bindgen]
 pub fn init() -> CanvasRenderingContext2d {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
     let document = web_sys::window()
         .expect("window")
         .document()
@@ -188,5 +185,12 @@ mod tests {
         ];
         assert_eq!(count_neighbors(&cells, 1, 1), 0);
         assert_eq!(count_neighbors(&cells, 0, 0), 1);
+        assert_eq!(count_neighbors(&cells, 2, 2), 1);
+    }
+
+    #[test]
+    fn test_coord_saturating_add() {
+        assert_eq!(coord_saturating_add(2, 1, 2), 2);
+        assert_eq!(coord_saturating_add(2, 1, 3), 3);
     }
 }
