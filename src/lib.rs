@@ -2,8 +2,8 @@ mod utils;
 
 use std::f64;
 use std::fmt::{Display, Formatter, Result, Write};
-use std::panic;
 
+use utils::set_panic_hook;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -11,6 +11,12 @@ use js_sys::Math::random;
 use web_sys::CanvasRenderingContext2d;
 
 const STEP: usize = 20;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Cell {
@@ -33,7 +39,7 @@ fn coord_saturating_add(a: usize, b: usize, max_value: usize) -> usize {
     }
 }
 
-fn count_neighbors(cells: &Vec<Vec<Cell>>, x: usize, y: usize) -> usize {
+fn count_neighbors(cells: &[Vec<Cell>], x: usize, y: usize) -> usize {
     (x.saturating_sub(1)..=coord_saturating_add(x, 1, cells.len() - 1))
         .map(|i| {
             (y.saturating_sub(1)..=coord_saturating_add(y, 1, cells.len() - 1))
@@ -67,13 +73,12 @@ impl Simulation {
         for i in 0..self.size {
             for j in 0..self.size {
                 let neighbors = count_neighbors(&self.cells, i, j);
-                self.cells[i][j] = if neighbors == 3 {
-                    Cell::Occupied
-                } else if neighbors == 2 && self.cells[i][j] == Cell::Occupied {
-                    Cell::Occupied
-                } else {
-                    Cell::Empty
-                }
+                self.cells[i][j] =
+                    if (neighbors == 3) || (neighbors == 2 && self.cells[i][j] == Cell::Occupied) {
+                        Cell::Occupied
+                    } else {
+                        Cell::Empty
+                    }
             }
         }
         self.turn += 1;
@@ -103,10 +108,10 @@ impl Simulation {
         let size = self.size;
         for x in 0..=size {
             for y in 0..=size {
-                context.move_to((x * STEP + 1) as f64, 1 as f64);
+                context.move_to((x * STEP + 1) as f64, 1_f64);
                 context.line_to((x * STEP + 1) as f64, (1 + STEP * size) as f64);
 
-                context.move_to(1 as f64, (y * STEP + 1) as f64);
+                context.move_to(1_f64, (y * STEP + 1) as f64);
                 context.line_to((1 + STEP * size) as f64, (y * STEP + 1) as f64);
             }
         }
@@ -126,8 +131,8 @@ impl Simulation {
         }
     }
 
-    pub fn to_string(&self) -> String {
-        format!("{}", &self)
+    pub fn debug_grid(&self) {
+        log(&format!("{}", self));
     }
 }
 
@@ -148,7 +153,8 @@ impl Display for Simulation {
 
 #[wasm_bindgen]
 pub fn init() -> CanvasRenderingContext2d {
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
+    set_panic_hook();
+
     let document = web_sys::window()
         .expect("window")
         .document()
