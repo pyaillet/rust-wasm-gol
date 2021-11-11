@@ -9,8 +9,7 @@ simu.draw_cells(ctx);
 
 let next = function(){ 
   simu.next_turn(ctx);
-  console.log(simu.to_string());
-  console.log(simu.turn);
+  simu.debug_grid();
   setTimeout(next, 800);
 };
 next();
